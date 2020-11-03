@@ -99,16 +99,19 @@ print(mean_face.shape)
 print("Computing Eigen vectors")
 eigvals, eigvects=np.linalg.eig(covar) #finding eigenvalues and eigenvectors of covariance matrix
 print("Eigen vectors calculated")
-eig_vectors=np.real(np.transpose(eigvects))
 mean_face=np.reshape(shortmean,(images.shape[1]*images.shape[2]))
 print(covar.shape)
 
 
 # ## Top 10 Eigenfaces
 
-# In[6]:
+# In[22]:
 
 
+idx = eigvals.argsort()[::-1]   
+eigvals = eigvals[idx]
+eigvects = eigvects[:,idx]
+eig_vectors=np.real(np.transpose(eigvects))
 for i in range(10):
     img = eig_vectors[i].reshape(images.shape[1],images.shape[2])
     plt.subplot(2,5,1+i)
@@ -119,13 +122,13 @@ for i in range(10):
     
 plt.show()
 print(eig_vectors.shape)
-imp_eig_vectors=eig_vectors[0:50] #taking only first 50 eigenvectors
-eig_vectors_pca=eig_vectors[0:10] #for pca computation
+imp_eig_vectors=eig_vectors[3:63] #taking only first 60 eigenvectors
+eig_vectors_pca=eig_vectors[3:13] #for pca computation
 
 
 # ## Reading an unknown face
 
-# In[7]:
+# In[23]:
 
 
 #image reconstruction
@@ -141,7 +144,7 @@ plt.show()
 # ## Finding the image classified to
 # 
 
-# In[8]:
+# In[24]:
 
 
 #first we need the weights for each training image. We project the normalized vector to imp_eig_vectors
@@ -149,7 +152,7 @@ w = np.array([np.dot(eig_vectors_pca,i) for i in normalized]) #dont use normaliz
 print(w[0].shape)
 
 
-# In[9]:
+# In[25]:
 
 
 
@@ -169,9 +172,11 @@ plt.title('Recognized Person')
 
 # ## Finding classification for all the test images
 
-# In[10]:
+# In[26]:
 
 
+crt=0
+total=0
 for i in range(0,len(testing_tensor)):
     u_face=testing_tensor[i]
     normalized_u_face=np.subtract(u_face,mean_face)
@@ -181,17 +186,21 @@ for i in range(0,len(testing_tensor)):
     index=np.argmin(norms) #find the index of the minimum norm (Distance) 
     plt.subplot(1,2,1)
     plt.imshow(u_face.reshape((55,55)),cmap='gray')
+    if(train_image_names[index].split(".")[0]==test_image_names[i].split(".")[0]):
+        crt+=1
     plt.title('Unknown Image')
     plt.subplot(1,2,2)
     plt.imshow(cv2.resize(imread('newtrain/'+train_image_names[index]),(50,50)), cmap='gray')
     plt.title('Recognized Person')
     plt.show()
+    total+=1
     
 
 
-# In[11]:
+# In[27]:
 
 
+print("The accuracy using eigenfaces is ",crt/total)
 d={'1':[],'2':[],'3':[],'4':[],'5':[],'6':[],'7':[],'8':[],'9':[],'10':[],'11':[],'12':[],'13':[],'14':[],'15':[]} #taking only 10 subjects for classification of train data
 k=1 
 while(k<16):
@@ -283,7 +292,7 @@ print("Sw calculated!")
 
 # ## Obtaining Fisherfaces
 
-# In[23]:
+# In[15]:
 
 
 #Compute the inverse matrix and get its eigenvectors and eigenvalues
@@ -293,6 +302,9 @@ inv_eigval, inv_eigvec=np.linalg.eig(BinvA) #The eigenvectors of this matrix wil
 print(inv_eigvec.shape)
 print("Length of eigenvectors of BinvA ",len(inv_eigvec))
 print("Important principal components",len(imp_eig_vectors))
+idx = inv_eigval.argsort()[::-1]   
+inv_eigval = inv_eigval[idx]
+inv_eigvec = inv_eigvec[:,idx]
 #Fisherfaces
 inv_eigvec=np.transpose(inv_eigvec) #This will be project on fishers
 plt.figure(figsize=(12,6))
@@ -303,12 +315,12 @@ for i in range(1,11,1):
     plt.subplots_adjust(right=0.8, top=0.7)
     plt.tick_params(labelleft='off', labelbottom='off', bottom='off',top='off',right='off',left='off', which='both')
 plt.show()
-inv_eigvec=inv_eigvec[:10]
+inv_eigvec=inv_eigvec[:10] #Taking c-1 fisherfaces
 
 
 # ## Get weights of training images using fisherfaces
 
-# In[24]:
+# In[16]:
 
 
 all_imgs_w = np.reshape(weights,(-1,inv_eigvec.shape[-1])) #75 training images, each image represented by 50 pca eigenfaces
@@ -326,7 +338,7 @@ print(len(train_coeffs))
 
 # ## Getting coefficients for test images using PCA
 
-# In[25]:
+# In[17]:
 
 
 test_imgs=testing_tensor #Using PCA
@@ -346,7 +358,7 @@ print(len(test_pca_coeffs))
 
 # ## Getting coefficients for test images using Fisherfaces after projecting on PCA
 
-# In[26]:
+# In[18]:
 
 
 test_flda = []
@@ -361,7 +373,7 @@ len(test_flda)
 
 # ## Making predictions by computing distance
 
-# In[27]:
+# In[19]:
 
 
 pred = []
@@ -371,13 +383,16 @@ for i in range(len(test_flda)):
         d.append(np.sum(np.square(test_flda[i]-train_coeffs[j])))
     d = np.array(d)
     pred.append(np.argmin(d))
+print(pred)
 
 
 # ## Compute accuracy of predictions of fishers
 
-# In[29]:
+# In[20]:
 
 
+crt2=0
+total2=0
 for i in range(0,len(test_imgs)):
     plt.subplot(1,2,1)
     plt.imshow(test_imgs[i].reshape((55,55)),cmap='gray')
@@ -386,16 +401,13 @@ for i in range(0,len(test_imgs)):
     plt.imshow(np.reshape(img_vectors[pred[i]],(55,55)),cmap='gray')
     plt.title('Recognized Person')
     plt.show()
+    if(train_image_names[i].split(".")[0]==test_image_names[pred[i]].split(".")[0]):
+        crt2+=1
+    total2+=1
 
 
-# In[30]:
+# In[21]:
 
 
-print("The accuracy using 10 Fisherfaces is ",63/75)
-
-
-# In[ ]:
-
-
-
+print("The accuracy using 10 Fisherfaces is ",crt2/total2)
 
